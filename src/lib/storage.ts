@@ -87,8 +87,9 @@ export const storage = {
     
     if (supabase) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && session.access_token) {
+          const user = session.user;
           const { data, error } = await supabase
             .from('sessions')
             .select('*')
@@ -133,8 +134,9 @@ export const storage = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (authSession?.user && authSession.access_token) {
+          const user = authSession.user;
           // Verify taskId is a valid UUID that exists in Supabase before attaching foreign key
           let safeTaskId: string | null = null;
           if (isValidUUID(newSession.taskId)) {
@@ -206,8 +208,9 @@ export const storage = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && session.access_token) {
+          const user = session.user;
           const { data, error } = await supabase
             .from('tasks')
             .select('*')
@@ -260,8 +263,9 @@ export const storage = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && session.access_token) {
+          const user = session.user;
           newTask.userId = user.id;
           const { data, error } = await supabase
             .from('tasks')

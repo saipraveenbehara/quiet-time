@@ -58,22 +58,34 @@ alter table public.tasks enable row level security;
 alter table public.sessions enable row level security;
 alter table public.distraction_notes enable row level security;
 
--- 6. RLS Policies
+-- 6. RLS Policies with explicit USING and WITH CHECK
+drop policy if exists "Users can view and edit their own profile" on public.profiles;
 create policy "Users can view and edit their own profile"
   on public.profiles for all
-  using (auth.uid() = id);
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
 
+drop policy if exists "Users can view and manage their own tasks" on public.tasks;
 create policy "Users can view and manage their own tasks"
   on public.tasks for all
-  using (auth.uid() = user_id);
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view and manage their own sessions" on public.sessions;
 create policy "Users can view and manage their own sessions"
   on public.sessions for all
-  using (auth.uid() = user_id);
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view and manage their own distraction notes" on public.distraction_notes;
 create policy "Users can view and manage their own distraction notes"
   on public.distraction_notes for all
-  using (auth.uid() = user_id);
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- 7. Trigger to automatically create a profile record when a new user signs up
 create or replace function public.handle_new_user()
