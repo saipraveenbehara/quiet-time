@@ -15,7 +15,6 @@ const STORAGE_KEYS = {
   ACTIVE_SESSION: 'study_timer_active_state',
 };
 
-// Default Guest Profile
 const DEFAULT_GUEST_PROFILE: UserProfile = {
   id: 'guest_user',
   email: null,
@@ -23,6 +22,11 @@ const DEFAULT_GUEST_PROFILE: UserProfile = {
   focusArea: 'Preparing for Exams & Projects',
   isGuest: true,
   preferences: DEFAULT_PREFERENCES,
+};
+
+const isValidUUID = (id?: string | null): boolean => {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 };
 
 export const storage = {
@@ -66,7 +70,6 @@ export const storage = {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEYS.PREFERENCES, JSON.stringify(prefs));
-      // Apply theme and low-stimulation classes immediately
       if (document.documentElement) {
         document.documentElement.setAttribute('data-theme', prefs.theme);
         document.documentElement.setAttribute('data-low-stimulation', prefs.lowStimulation ? 'true' : 'false');
@@ -79,7 +82,9 @@ export const storage = {
 
   // --- Sessions ---
   async getSessions(): Promise<StudySession[]> {
+    const local = this.getLocalSessions();
     const supabase = getSupabaseClient();
+    
     if (supabase) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -91,7 +96,7 @@ export const storage = {
             .order('created_at', { ascending: false });
 
           if (!error && data) {
-            return data.map((d) => ({
+            const cloudSessions: StudySession[] = data.map((d) => ({
               id: d.id,
               userId: d.user_id,
               taskTitle: d.task_title || 'Untitled focus',
@@ -100,9 +105,14 @@ export const storage = {
               actualSeconds: d.actual_seconds,
               completed: d.completed,
               reflectionNote: d.reflection_note,
-              sessionType: d.session_type || 'focus',
+              sessionType: (d.session_type as 'focus' | 'break') || 'focus',
               createdAt: d.created_at,
             }));
+
+            // Merge cloud and any unsynced local sessions
+            const cloudIds = new Set(cloudSessions.map((s) => s.id));
+            const unsyncedLocal = local.filter((s) => !cloudIds.has(s.id));
+            return [...cloudSessions, ...unsyncedLocal];
           }
         }
       } catch (e) {
@@ -110,14 +120,7 @@ export const storage = {
       }
     }
 
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error('Failed reading sessions from localStorage', e);
-      return [];
-    }
+    return local;
   },
 
   async saveSession(session: Omit<StudySession, 'id' | 'createdAt'>): Promise<StudySession> {
@@ -132,35 +135,53 @@ export const storage = {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          // Verify taskId is a valid UUID that exists in Supabase before attaching foreign key
+          let safeTaskId: string | null = null;
+          if (isValidUUID(newSession.taskId)) {
+            const { data: taskRow } = await supabase
+              .from('tasks')
+              .select('id')
+              .eq('id', newSession.taskId)
+              .maybeSingle();
+            if (taskRow) {
+              safeTaskId = taskRow.id;
+            }
+          }
+
           const { data, error } = await supabase
             .from('sessions')
             .insert({
               user_id: user.id,
               task_title: newSession.taskTitle,
-              task_id: newSession.taskId,
+              task_id: safeTaskId,
               duration_minutes: newSession.durationMinutes,
               actual_seconds: newSession.actualSeconds,
               completed: newSession.completed,
-              reflection_note: newSession.reflectionNote,
+              reflection_note: newSession.reflectionNote || null,
               session_type: newSession.sessionType,
             })
             .select()
             .single();
 
-          if (!error && data) {
+          if (error) {
+            console.error('Supabase session insert error:', error.message, error.details);
+          } else if (data) {
             newSession.id = data.id;
+            newSession.userId = data.user_id;
           }
+        } else {
+          console.log('User is in Guest mode. Session saved locally to browser storage.');
         }
       } catch (e) {
-        console.error('Supabase session insert error', e);
+        console.error('Supabase session insert exception:', e);
       }
     }
 
     // Always mirror to localStorage for offline access and guest sessions
     if (typeof window !== 'undefined') {
       try {
-        const current = await this.getLocalSessions();
-        const updated = [newSession, ...current];
+        const current = this.getLocalSessions();
+        const updated = [newSession, ...current.filter((s) => s.id !== newSession.id)];
         localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
       } catch (e) {
         console.error('Failed writing session to localStorage', e);
@@ -225,8 +246,9 @@ export const storage = {
     const existing = currentTasks.find((t) => t.title.toLowerCase() === trimmed.toLowerCase() && !t.isCompleted);
     if (existing) return existing;
 
+    const generatedId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `task_${Date.now()}`;
     const newTask: Task = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `task_${Date.now()}`,
+      id: generatedId,
       userId: 'guest_user',
       title: trimmed,
       isCompleted: false,
@@ -285,7 +307,7 @@ export const storage = {
     }
 
     const supabase = getSupabaseClient();
-    if (supabase) {
+    if (supabase && isValidUUID(taskId)) {
       try {
         const target = updated.find((t) => t.id === taskId);
         if (target) {
@@ -309,13 +331,39 @@ export const storage = {
     return unfinished.length > 0 ? unfinished[0] : null;
   },
 
+  // Sync any unsynced local sessions to Supabase when a user signs in
+  async syncLocalSessionsToCloud(userId: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const localSessions = this.getLocalSessions();
+    if (localSessions.length === 0) return;
+
+    for (const session of localSessions) {
+      try {
+        await supabase.from('sessions').insert({
+          user_id: userId,
+          task_title: session.taskTitle,
+          duration_minutes: session.durationMinutes,
+          actual_seconds: session.actualSeconds,
+          completed: session.completed,
+          reflection_note: session.reflectionNote || null,
+          session_type: session.sessionType,
+          created_at: session.createdAt,
+        });
+      } catch (e) {
+        console.error('Error syncing local session to cloud:', e);
+      }
+    }
+  },
+
   // --- Active Session Persistence for Tab Refresh / Backgrounding ---
   saveActiveSessionState(state: {
     mode: 'focus' | 'break';
     taskTitle: string;
     taskId?: string | null;
     totalDurationSeconds: number;
-    endTimestamp: number | null; // epoch ms
+    endTimestamp: number | null;
     secondsRemaining: number;
     isPaused: boolean;
     startedAt: string;

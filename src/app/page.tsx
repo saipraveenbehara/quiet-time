@@ -71,6 +71,7 @@ export default function Home() {
             };
             setProfile(userProfile);
             storage.saveProfile(userProfile);
+            await storage.syncLocalSessionsToCloud(session.user.id);
           }
         }
       );
@@ -124,7 +125,7 @@ export default function Home() {
     notes: string[],
     taskTitle: string
   ) => {
-    if (actualSeconds > 30) {
+    if (actualSeconds >= 5) {
       await storage.saveSession({
         userId: profile.id || 'guest_user',
         taskTitle,
@@ -142,6 +143,7 @@ export default function Home() {
     }
     setDistractionNotes(notes);
     setSessionState('idle');
+    setCurrentTab('history');
   };
 
   const handleSaveReflectionAndNext = async (reflectionNote?: string) => {

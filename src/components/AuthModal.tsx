@@ -87,6 +87,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               preferences: storage.getPreferences(),
             };
             storage.saveProfile(newProfile);
+            await storage.syncLocalSessionsToCloud(data.user.id);
             setSuccessMessage('Account created! Welcome to Quiet Study.');
             setTimeout(() => {
               onAuthSuccess(newProfile);
@@ -110,6 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               preferences: storage.getPreferences(),
             };
             storage.saveProfile(updatedProfile);
+            await storage.syncLocalSessionsToCloud(data.user.id);
             setSuccessMessage('Signed in successfully.');
             setTimeout(() => {
               onAuthSuccess(updatedProfile);
