@@ -1,26 +1,117 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-canvas: #FAF8F5;
+    --bg-card: #FFFFFF;
+    --bg-card-subtle: #F4EFEA;
+    --bg-card-hover: #EFE9E2;
+    --border: #E6DFD5;
+    --border-hover: #D3CAC0;
+    --text-primary: #262420;
+    --text-secondary: #6B655B;
+    --text-muted: #968F84;
+    --text-on-accent: #FFFFFF;
+    
+    --accent-focus: #284E3C;
+    --accent-focus-light: #EBF2ED;
+    --accent-focus-border: #BCD1C4;
+    
+    --accent-break: #B35E26;
+    --accent-break-light: #FAF1EA;
+    --accent-break-border: #E8C8B1;
+    
+    --accent-rest: #3A6978;
+    --accent-rest-light: #EBF3F6;
+    
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+    
+    --font-serif: ui-serif, 'Newsreader', 'Charter', 'Iowan Old Style', 'Georgia', serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  [data-theme="dark"] {
+    --bg-canvas: #161514;
+    --bg-card: #201E1C;
+    --bg-card-subtle: #292724;
+    --bg-card-hover: #32302C;
+    --border: #35322D;
+    --border-hover: #47433D;
+    --text-primary: #ECE7DE;
+    --text-secondary: #AAA293;
+    --text-muted: #797367;
+    --text-on-accent: #FFFFFF;
+    
+    --accent-focus: #4F8B6D;
+    --accent-focus-light: #1D2E24;
+    --accent-focus-border: #2C4E3A;
+    
+    --accent-break: #CC773B;
+    --accent-break-light: #2E2016;
+    --accent-break-border: #4D3220;
+    
+    --accent-rest: #508696;
+    --accent-rest-light: #1B292E;
+  }
+
+  [data-low-stimulation="true"] {
+    --accent-focus: #52635A;
+    --accent-focus-light: #EEF1EF;
+    --accent-break: #756758;
+    --accent-break-light: #F2EFEB;
+    --border: #DCD8D0;
+    --text-primary: #3B3935;
+  }
+
+  [data-reduced-motion="true"] *,
+  [data-reduced-motion="true"] *::before,
+  [data-reduced-motion="true"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--accent-focus);
+  outline-offset: 2px;
+}
+
+/* Custom editorial scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+.font-editorial-serif {
+  font-family: var(--font-serif);
+}
+
+.paper-texture {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 0);
+  background-size: 24px 24px;
 }
