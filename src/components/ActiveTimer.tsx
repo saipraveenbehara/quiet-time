@@ -62,6 +62,9 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
   const [isDistractionOpen, setIsDistractionOpen] = useState<boolean>(false);
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState<boolean>(false);
 
+  const isEndedRef = useRef<boolean>(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const endTimestampRef = useRef<number | null>(
     restoredState?.endTimestamp || (restoredState?.isPaused ? null : Date.now() + initialSecondsLeft * 1000)
   );
@@ -71,6 +74,7 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
   // Save state to storage
   const persistState = useCallback(
     (remaining: number, paused: boolean, currentEndTs: number | null) => {
+      if (isEndedRef.current) return;
       storage.saveActiveSessionState({
         mode: 'focus',
         taskTitle,
@@ -87,6 +91,8 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
 
   // Sound completion notification
   const handleComplete = useCallback(() => {
+    isEndedRef.current = true;
+    if (intervalRef.current) clearInterval(intervalRef.current);
     storage.saveActiveSessionState(null);
     if (soundEnabled) {
       soundService.playCompletionChime();
@@ -97,6 +103,8 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
 
   // Main high-precision interval
   useEffect(() => {
+    if (isEndedRef.current) return;
+
     if (isPaused) {
       endTimestampRef.current = null;
       persistState(secondsRemaining, true, null);
@@ -109,8 +117,8 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
 
     persistState(secondsRemaining, false, endTimestampRef.current);
 
-    const interval = setInterval(() => {
-      if (!endTimestampRef.current) return;
+    intervalRef.current = setInterval(() => {
+      if (isEndedRef.current || !endTimestampRef.current) return;
       const now = Date.now();
       const diff = Math.max(0, Math.round((endTimestampRef.current - now) / 1000));
 
@@ -118,13 +126,15 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
       persistState(diff, false, endTimestampRef.current);
 
       if (diff <= 0) {
-        clearInterval(interval);
+        if (intervalRef.current) clearInterval(intervalRef.current);
         handleComplete();
       }
-    }, 250);
+    }, 500);
 
-    return () => clearInterval(interval);
-  }, [isPaused, persistState, secondsRemaining, handleComplete]);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPaused, persistState, handleComplete]);
 
   // Toggle pause/resume
   const handleTogglePause = () => {
@@ -146,6 +156,8 @@ export const ActiveTimer: React.FC<ActiveTimerProps> = ({
 
   // Early end / cancellation confirmation
   const handleConfirmEndEarly = () => {
+    isEndedRef.current = true;
+    if (intervalRef.current) clearInterval(intervalRef.current);
     storage.saveActiveSessionState(null);
     const elapsed = totalSeconds - secondsRemaining;
     onSessionCancel(elapsed, distractionNotes, taskTitle);

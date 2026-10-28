@@ -97,6 +97,7 @@ export default function Home() {
     notes: string[],
     taskTitle: string
   ) => {
+    storage.saveActiveSessionState(null);
     setLastCompletedSeconds(actualSeconds);
     setDistractionNotes(notes);
     setCurrentTaskTitle(taskTitle);
@@ -125,6 +126,7 @@ export default function Home() {
     notes: string[],
     taskTitle: string
   ) => {
+    storage.saveActiveSessionState(null);
     if (actualSeconds >= 5) {
       await storage.saveSession({
         userId: profile.id || 'guest_user',
@@ -164,11 +166,13 @@ export default function Home() {
   };
 
   const handleStartNextFocus = () => {
+    storage.saveActiveSessionState(null);
     setSessionState('idle');
     setCurrentTab('timer');
   };
 
   const handleFinishEverything = () => {
+    storage.saveActiveSessionState(null);
     setSessionState('idle');
     setCurrentTab('history');
   };
